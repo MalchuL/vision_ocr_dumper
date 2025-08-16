@@ -60,69 +60,9 @@ class OCRDumper:
             # Process annotations - simplified structure
             annotations: Dict[str, Any] = {
                 'file_name': image_path.name,
-                'document_text': '',
-                'pages': []
+                'response': json.loads(MessageToJson(document_response._pb))
             }
             
-            # Process document text
-            if document:
-                annotations['document_text'] = document.text
-                
-                for page in document.pages:
-                    page_data = {
-                        'width': page.width,
-                        'height': page.height,
-                        'confidence': page.confidence,
-                        'blocks': []
-                    }
-                    
-                    for block in page.blocks:
-                        block_data = {
-                            'confidence': block.confidence,
-                            'block_type': block.block_type.name,
-                            'bounding_box': {
-                                'vertices': [
-                                    {'x': vertex.x, 'y': vertex.y}
-                                    for vertex in block.bounding_box.vertices
-                                ]
-                            },
-                            'paragraphs': []
-                        }
-                        
-                        for paragraph in block.paragraphs:
-                            para_data = {
-                                'confidence': paragraph.confidence,
-                                'bounding_box': {
-                                    'vertices': [
-                                        {'x': vertex.x, 'y': vertex.y}
-                                        for vertex in paragraph.bounding_box.vertices
-                                    ]
-                                },
-                                'words': []
-                            }
-                            
-                            for word in paragraph.words:
-                                # Extract word text from symbols
-                                word_text = ''.join([symbol.text for symbol in word.symbols])
-                                
-                                word_data = {
-                                    'text': word_text,
-                                    'confidence': word.confidence,
-                                    'bounding_box': {
-                                        'vertices': [
-                                            {'x': vertex.x, 'y': vertex.y}
-                                            for vertex in word.bounding_box.vertices
-                                        ]
-                                    }
-                                }
-                                
-                                para_data['words'].append(word_data)
-                            
-                            block_data['paragraphs'].append(para_data)
-                        
-                        page_data['blocks'].append(block_data)
-                    
-                    annotations['pages'].append(page_data)
             
             return annotations
             

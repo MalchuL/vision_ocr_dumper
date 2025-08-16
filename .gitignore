@@ -10,3 +10,7 @@ wheels/
 .venv
 .history/
 .cursor/
+menu-parser-*.json
+
+data/.env
+ocr_output/
