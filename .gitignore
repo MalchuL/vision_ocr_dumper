@@ -12,5 +12,7 @@ wheels/
 .cursor/
 menu-parser-*.json
 
-data/.env
+.env
 ocr_output/
+visualizations/
+test_settings.yaml

@@ -6,13 +6,14 @@ A powerful tool to extract and dump Google Cloud Vision OCR predictions from ima
 
 - **Cost-Optimized OCR**: Uses only document_text_detection API to minimize costs
 - **YOLO-like Structure**: Organizes output with `images/` and `labels/` folders
+- **Advanced Visualization**: Draw bounding boxes and text on images with customizable settings
 - **Environment Configuration**: Full support for `.env` files and environment variables
 - **Batch Processing**: Process multiple images efficiently
-- **Detailed Annotations**: Get word-level, paragraph-level, and document-level information
+- **Multi-Level Annotations**: Support for page, block, paragraph, word, and character level detection
 - **Rich CLI Interface**: Beautiful command-line interface with progress tracking
 - **Flexible Input**: Support for single files or directory processing
-- **Image Copying**: Automatically copies processed images to output structure
-- **Summary Reports**: Generate processing statistics and reports
+- **Configurable Drawing**: YAML-based settings for colors, thickness, and text rendering
+- **Raw JSON Output**: Complete Google Vision API response data preserved
 
 ## Supported Formats
 
@@ -92,49 +93,78 @@ gcloud auth application-default login
 
 ```bash
 # Process a single image
-ocr-dump image.jpg
+ocr-dump process image.jpg
 
 # Process all images in a directory
-ocr-dump /path/to/images/
+ocr-dump process /path/to/images/
 
 # Process with custom output directory (creates images/ and labels/ subdirs)
-ocr-dump images/ --output-dir ./results
+ocr-dump process images/ --output-dir ./results
 
 # Process recursively in subdirectories
-ocr-dump images/ --recursive
+ocr-dump process images/ --recursive
+
+# Visualize a single image (after processing)
+ocr-dump draw image.jpg
+
+# Visualize all images in a directory
+ocr-dump draw ./ocr_output
+
+# Create customizable settings file
+ocr-dump init-settings
 ```
 
 ### Advanced Usage
 
 ```bash
-# Specify credentials file
-ocr-dump images/ --credentials /path/to/creds.json
+# Processing with options
+ocr-dump process images/ --credentials /path/to/creds.json
 
 # Process with all options
-ocr-dump images/ \
+ocr-dump process images/ \
     --output-dir ./ocr_results \
     --recursive \
     --credentials ./service-account.json
+
+# Visualization with custom settings
+ocr-dump draw images/ \
+    --labels-dir ./ocr_output/labels \
+    --output-dir ./visualizations \
+    --settings custom_draw_settings.yaml
+
+# Initialize and customize visualization settings
+ocr-dump init-settings --output my_settings.yaml
+# Edit my_settings.yaml to customize colors, thickness, etc.
+ocr-dump draw images/ --settings my_settings.yaml
 ```
 
 ### Command Line Options
 
 ```
-Usage: ocr-dump [OPTIONS] INPUT_PATH
+Usage: ocr-dump [OPTIONS] COMMAND [ARGS]...
 
-  Dump Google Cloud Vision OCR predictions from images in YOLO-like structure.
-  
-  Creates OUTPUT_DIR with 'images/' and 'labels/' folders.
-  For each image, copies it to images/ and saves OCR JSON to labels/ with same name.
+  OCR Annotation Dumper - Extract and visualize Google Cloud Vision OCR predictions.
 
-  INPUT_PATH can be a single image file or a directory containing images.
-  Uses only document_text_detection API to minimize costs.
+Commands:
+  process        Process images and extract OCR annotations
+  draw          Visualize OCR annotations by drawing bounding boxes
+  init-settings Create a default draw_settings.yaml file
 
-Options:
-  -o, --output-dir PATH      Output directory (will create images/ and labels/ subdirs) [default: ./ocr_output]
-  -c, --credentials PATH     Path to Google Cloud credentials JSON file
-  -r, --recursive            Process images recursively in subdirectories (only for folders)
-  --help                     Show this message and exit.
+# Process command options:
+ocr-dump process [OPTIONS] INPUT_PATH
+  -o, --output-dir PATH      Output directory (creates images/ and labels/ subdirs)
+  -c, --credentials PATH     Path to Google Cloud credentials JSON file  
+  -r, --recursive            Process images recursively in subdirectories
+
+# Draw command options:
+ocr-dump draw [OPTIONS] INPUT_PATH
+  -l, --labels-dir PATH      Directory containing JSON label files
+  -o, --output-dir PATH      Output directory for visualizations
+  -s, --settings PATH        Path to visualization settings YAML file
+
+# Init-settings command options:
+ocr-dump init-settings [OPTIONS]
+  -o, --output PATH          Output path for the settings file
 ```
 
 ## Output Structure
@@ -157,55 +187,67 @@ Each image is copied to the `images/` folder, and its corresponding OCR annotati
 
 ### JSON Output Format
 
-Each annotation file in `labels/` contains:
+Each annotation file in `labels/` contains the complete Google Vision API response:
 
 ```json
 {
   "file_name": "image.jpg",
-  "document_text": "Full document text extracted from the image...",
-  "pages": [
-    {
-      "width": 1920,
-      "height": 1080,
-      "confidence": 0.95,
-      "blocks": [
+  "response": {
+    "fullTextAnnotation": {
+      "text": "Complete extracted text from the document...",
+      "pages": [
         {
-          "confidence": 0.98,
-          "block_type": "TEXT",
-          "bounding_box": {
-            "vertices": [
-              {"x": 100, "y": 200},
-              {"x": 300, "y": 200},
-              {"x": 300, "y": 250},
-              {"x": 100, "y": 250}
-            ]
-          },
-          "paragraphs": [
+          "width": 1920,
+          "height": 1080,
+          "confidence": 0.95,
+          "blocks": [
             {
-              "confidence": 0.97,
-              "bounding_box": { "vertices": [...] },
-              "words": [
+              "confidence": 0.98,
+              "blockType": "TEXT",
+              "boundingBox": {
+                "vertices": [
+                  {"x": 100, "y": 200},
+                  {"x": 300, "y": 200},
+                  {"x": 300, "y": 250},
+                  {"x": 100, "y": 250}
+                ]
+              },
+              "paragraphs": [
                 {
-                  "text": "Hello",
-                  "confidence": 0.99,
-                  "bounding_box": { "vertices": [...] }
+                  "confidence": 0.97,
+                  "boundingBox": { "vertices": [...] },
+                  "words": [
+                    {
+                      "confidence": 0.99,
+                      "boundingBox": { "vertices": [...] },
+                      "symbols": [
+                        {
+                          "text": "H",
+                          "confidence": 0.99,
+                          "boundingBox": { "vertices": [...] }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
           ]
         }
       ]
-    }
-  ]
+    },
+    "textAnnotations": [...],
+    "error": null
+  }
 }
 ```
 
 The format includes:
-- **document_text**: Full extracted text from the document
-- **pages**: Array of page information with dimensions and confidence
-- **blocks**: Text blocks with bounding boxes and confidence scores
-- **paragraphs**: Paragraph-level information
-- **words**: Individual words with text, confidence, and bounding boxes
+- **file_name**: Original image filename
+- **response**: Complete Google Vision API response in JSON format
+- **fullTextAnnotation**: Hierarchical text structure with pages, blocks, paragraphs, words, and symbols
+- **textAnnotations**: Alternative flat text annotation format
+- **error**: Any API errors encountered
 
 ## Python API
 
@@ -228,6 +270,79 @@ dumper.dump_annotations(image_paths, output_dir=Path("./output"))
 # This will create:
 # ./output/images/img1.jpg, ./output/images/img2.jpg
 # ./output/labels/img1.json, ./output/labels/img2.json
+```
+
+## Visualization
+
+The tool includes powerful visualization capabilities to draw bounding boxes and text on images based on OCR results.
+
+### Visualization Settings
+
+Create and customize `draw_settings.yaml` to control visualization appearance:
+
+```bash
+# Create default settings file
+ocr-dump init-settings
+
+# Edit the file to customize
+nano draw_settings.yaml
+```
+
+Example `draw_settings.yaml`:
+
+```yaml
+# Page level settings
+page:
+  draw: true
+  color: [255, 0, 0]     # Red color in BGR format
+  thickness: 3
+  draw_text: true
+
+# Block level settings  
+block:
+  draw: true
+  color: [0, 255, 0]     # Green color
+  thickness: 2
+  draw_text: true
+
+# Word level settings
+word:
+  draw: true
+  color: [255, 255, 0]   # Cyan color
+  thickness: 1
+  draw_text: true
+
+# Character level settings
+character:
+  draw: false            # Disable by default
+  color: [255, 0, 255]   # Magenta color
+  thickness: 1
+  draw_text: false
+
+# Global settings
+global:
+  output_dir: "./visualizations"
+  confidence_threshold: 0.5
+  show_confidence: true
+```
+
+### Visualization Examples
+
+```bash
+# Visualize a single image
+ocr-dump draw image.jpg
+
+# Visualize all images in a processed directory
+ocr-dump draw ./ocr_output
+
+# Custom visualization with settings
+ocr-dump draw images/ \
+    --labels-dir ./ocr_output/labels \
+    --output-dir ./custom_viz \
+    --settings my_draw_settings.yaml
+
+# Visualize with specific labels directory
+ocr-dump draw images/ --labels-dir labels/
 ```
 
 ## Configuration

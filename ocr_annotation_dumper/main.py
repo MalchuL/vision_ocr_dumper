@@ -22,6 +22,7 @@ from PIL import Image
 load_dotenv()
 
 from .config import Config
+from .visualizer import OCRVisualizer
 
 console = Console()
 
@@ -146,7 +147,12 @@ class OCRDumper:
         console.print(table)
 
 
-@click.command()
+@click.group()
+def cli():
+    """OCR Annotation Dumper - Extract and visualize Google Cloud Vision OCR predictions."""
+    pass
+
+@cli.command()
 @click.argument('input_path', type=click.Path(exists=True, path_type=Path))
 @click.option('--output-dir', '-o', type=click.Path(path_type=Path), 
               default=lambda: Config.get_output_dir(), 
@@ -157,7 +163,7 @@ class OCRDumper:
 @click.option('--recursive', '-r', is_flag=True,
               default=lambda: Config.is_recursive_default(),
               help='Process images recursively in subdirectories (only for folders)')
-def cli(input_path: Path, output_dir: Path, credentials: Optional[Path], recursive: bool):
+def process(input_path: Path, output_dir: Path, credentials: Optional[Path], recursive: bool):
     """
     Dump Google Cloud Vision OCR predictions from images in YOLO-like structure.
     
@@ -216,6 +222,153 @@ def cli(input_path: Path, output_dir: Path, credentials: Optional[Path], recursi
     console.print(f"\n[bold green]Processing complete![/bold green]")
     console.print(f"[blue]Images copied to: {output_dir}/images/[/blue]")
     console.print(f"[blue]Labels saved to: {output_dir}/labels/[/blue]")
+
+
+@cli.command()
+@click.argument('input_path', type=click.Path(exists=True, path_type=Path))
+@click.option('--labels-dir', '-l', type=click.Path(exists=True, path_type=Path),
+              help='Directory containing JSON label files (default: auto-detect)')
+@click.option('--output-dir', '-o', type=click.Path(path_type=Path),
+              help='Output directory for visualizations (default: ./visualizations)')
+@click.option('--settings', '-s', type=click.Path(exists=True, path_type=Path),
+              default=Path('draw_settings.yaml'),
+              help='Path to visualization settings YAML file')
+def draw(input_path: Path, labels_dir: Optional[Path], output_dir: Optional[Path], 
+         settings: Path):
+    """
+    Visualize OCR annotations by drawing bounding boxes on images.
+    
+    INPUT_PATH can be a single image file or a directory containing images.
+    For directories, it will look for corresponding JSON files in labels_dir.
+    """
+    console.print("[bold blue]OCR Annotation Visualizer[/bold blue]")
+    console.print(f"Input: {input_path}")
+    console.print(f"Settings: {settings}")
+    
+    # Initialize visualizer
+    try:
+        visualizer = OCRVisualizer(settings)
+    except Exception as e:
+        console.print(f"[red]Error initializing visualizer: {e}[/red]")
+        return
+    
+    if input_path.is_file():
+        # Single image visualization
+        if labels_dir is None:
+            # Try to find label file in same directory
+            label_path = input_path.parent.parent/ "labels" / f"{input_path.stem}.json"
+        else:
+            label_path = labels_dir / f"{input_path.stem}.json"
+            
+        if not label_path.exists():
+            console.print(f"[red]Label file not found: {label_path}[/red]")
+            console.print("[yellow]Make sure to run 'ocr-dump process' first to generate labels[/yellow]")
+            return
+            
+        console.print(f"Label file: {label_path}")
+        result_path = visualizer.visualize_annotations(input_path, label_path, output_dir)
+        
+        if result_path != input_path:
+            console.print(f"[green]Visualization saved to: {result_path}[/green]")
+        
+    elif input_path.is_dir():
+        # Directory visualization
+        if labels_dir is None:
+            # Auto-detect: look for 'labels' subdirectory or use input directory
+            potential_labels_dir = input_path / 'labels'
+            if potential_labels_dir.exists():
+                labels_dir = potential_labels_dir
+                images_dir = input_path / 'images'
+                if not images_dir.exists():
+                    images_dir = input_path
+            else:
+                labels_dir = input_path
+                images_dir = input_path
+        else:
+            images_dir = input_path
+            
+        console.print(f"Images directory: {images_dir}")
+        console.print(f"Labels directory: {labels_dir}")
+        
+        if not labels_dir.exists():
+            console.print(f"[red]Labels directory not found: {labels_dir}[/red]")
+            return
+            
+        result_paths = visualizer.visualize_folder(images_dir, labels_dir, output_dir)
+        
+        if result_paths:
+            console.print(f"[green]Generated {len(result_paths)} visualizations[/green]")
+        else:
+            console.print("[yellow]No visualizations were generated[/yellow]")
+    
+    console.print("[bold green]Visualization complete![/bold green]")
+
+
+@cli.command()
+@click.option('--output', '-o', type=click.Path(path_type=Path),
+              default=Path('draw_settings.yaml'),
+              help='Output path for the settings file')
+def init_settings(output: Path):
+    """Create a default draw_settings.yaml file for customization."""
+    if output.exists():
+        if not click.confirm(f"File {output} already exists. Overwrite?"):
+            console.print("[yellow]Operation cancelled[/yellow]")
+            return
+    
+    # Copy the default settings
+    import shutil
+    default_settings = Path(__file__).parent.parent / 'draw_settings.yaml'
+    
+    try:
+        if default_settings.exists():
+            shutil.copy2(default_settings, output)
+        else:
+            # Create default settings if template doesn't exist
+            default_content = """# OCR Annotation Visualization Settings
+page:
+  draw: true
+  color: [255, 0, 0]
+  thickness: 3
+  draw_text: true
+
+block:
+  draw: true
+  color: [0, 255, 0]
+  thickness: 2
+  draw_text: true
+
+paragraph:
+  draw: true
+  color: [0, 0, 255]
+  thickness: 2
+  draw_text: false
+
+word:
+  draw: true
+  color: [255, 255, 0]
+  thickness: 1
+  draw_text: true
+
+character:
+  draw: false
+  color: [255, 0, 255]
+  thickness: 1
+  draw_text: false
+
+global:
+  output_dir: "./visualizations"
+  output_format: "png"
+  show_confidence: true
+  confidence_threshold: 0.5
+"""
+            with open(output, 'w') as f:
+                f.write(default_content)
+        
+        console.print(f"[green]Created settings file: {output}[/green]")
+        console.print("[blue]Edit this file to customize visualization settings[/blue]")
+        
+    except Exception as e:
+        console.print(f"[red]Error creating settings file: {e}[/red]")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,82 @@
+# OCR Annotation Visualization Settings
+# Configure drawing parameters for different text detection levels
+
+# Page level settings
+page:
+  draw: true
+  color: [255, 0, 0]     # Red color in BGR format
+  thickness: 3
+  draw_text: true
+  text_color: [255, 0, 0]
+  text_size: 0.8
+  text_thickness: 2
+
+# Block level settings  
+block:
+  draw: true
+  color: [0, 255, 0]     # Green color in BGR format
+  thickness: 2
+  draw_text: true
+  text_color: [0, 255, 0]
+  text_size: 0.6
+  text_thickness: 1
+
+# Paragraph level settings
+paragraph:
+  draw: true
+  color: [0, 0, 255]     # Blue color in BGR format
+  thickness: 2
+  draw_text: false
+  text_color: [0, 0, 255]
+  text_size: 0.5
+  text_thickness: 1
+
+# Word level settings
+word:
+  draw: true
+  color: [255, 255, 0]   # Cyan color in BGR format
+  thickness: 1
+  draw_text: true
+  text_color: [255, 255, 0]
+  text_size: 0.4
+  text_thickness: 1
+
+# Character (symbol) level settings
+character:
+  draw: false
+  color: [255, 0, 255]   # Magenta color in BGR format
+  thickness: 1
+  draw_text: false
+  text_color: [255, 0, 255]
+  text_size: 0.3
+  text_thickness: 1
+
+# Global settings
+global:
+  # Output directory for visualization images
+  output_dir: "./visualizations"
+  
+  # Image format for saved visualizations
+  output_format: "png"
+  
+  # Image quality (for JPEG format)
+  quality: 95
+  
+  # Font type for text rendering
+  font: "FONT_HERSHEY_SIMPLEX"
+  
+  # Background transparency for text
+  text_background: true
+  text_background_color: [255, 255, 255]  # White background
+  text_background_alpha: 0.7
+  
+  # Line type for drawing rectangles
+  line_type: "LINE_AA"  # Anti-aliased lines
+  
+  # Whether to show confidence scores
+  show_confidence: true
+  confidence_threshold: 0.5  # Only show text with confidence above this
+  
+  # Text positioning offset from bounding box
+  text_offset_x: 5
+  text_offset_y: -5
